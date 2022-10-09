@@ -1,0 +1,6 @@
+x_4 = log(1:20)
+y_4 = c(1, 6, 16, 23, 27, 39, 31, 30, 43, 51, 63, 70, 88, 97, 91, 104, 110, 113, 149, 159)
+fit = glm(y_4~x_4, family=poisson)
+summary(fit)
+par(mfrow=c(2,2))
+plot(fit)
