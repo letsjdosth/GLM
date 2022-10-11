@@ -11,7 +11,6 @@ def simplified_NRe_optimizer(initial, score, expected_infomation, data, toleranc
     while(True):
         last = optimized_seq[-1]
         new = last + np.linalg.inv(expected_infomation(last, data)) @ score(last, data)
-        # print(new)
         optimized_seq.append(new)
         if l2_norm(last, new)<tolerance:
             break
@@ -23,7 +22,6 @@ def simplified_NRo_optimizer(initial, score, obs_infomation, data, tolerance = 0
     while(True):
         last = optimized_seq[-1]
         new = last - np.linalg.inv(obs_infomation(last, data)) @ score(last, data)
-        # print(new)
         optimized_seq.append(new)
         if l2_norm(last, new)<tolerance:
             break

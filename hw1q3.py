@@ -1,6 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+def l2_norm(x,y):
+    return (sum([(a-b)**2 for a,b in zip(x,y)]))**0.5
+
 def simplified_NRe_optimizer(initial, score, expected_infomation, data, tolerance = 0.001):
     optimized_seq = [initial]
     
@@ -8,7 +11,7 @@ def simplified_NRe_optimizer(initial, score, expected_infomation, data, toleranc
         last = optimized_seq[-1]
         new = last + np.linalg.inv(expected_infomation(last, data)) @ score(last, data)
         optimized_seq.append(new)
-        if abs(last-new)<tolerance:
+        if l2_norm(last, new)<tolerance:
             break
     return optimized_seq[-1]
 
@@ -19,9 +22,11 @@ def simplified_NRo_optimizer(initial, score, obs_infomation, data, tolerance = 0
         last = optimized_seq[-1]
         new = last - np.linalg.inv(obs_infomation(last, data)) @ score(last, data)
         optimized_seq.append(new)
-        if abs(last-new)<tolerance:
+        if l2_norm(last, new)<tolerance:
             break
     return optimized_seq[-1]
+
+
 
 # cauchy(0,1) case
 def cauchy_theta_1_log_likelihood(theta, data):
@@ -50,6 +55,12 @@ def cauchy_theta_1_expected_information(_, data):
 
 # problem 3b
 y_3b = [-0.774, 0.597, 7.575, 0.397, -0.865, -0.318, -0.125, 0.961, 1.039]
+
+for initial in [[-1], [4.67], [10]]:
+    mle_NRe_3b_init_test = simplified_NRe_optimizer(initial, cauchy_theta_1_score, cauchy_theta_1_expected_information, y_3b)
+    mle_NRo_3b_init_test = simplified_NRo_optimizer(initial, cauchy_theta_1_score, cauchy_theta_1_hessian, y_3b)
+    print(mle_NRe_3b_init_test, mle_NRo_3b_init_test)
+
 initial_3b = np.array([0])
 mle_NRe_3b = simplified_NRe_optimizer(initial_3b, cauchy_theta_1_score, cauchy_theta_1_expected_information, y_3b)
 mle_NRo_3b = simplified_NRo_optimizer(initial_3b, cauchy_theta_1_score, cauchy_theta_1_hessian, y_3b)
