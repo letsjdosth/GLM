@@ -217,29 +217,29 @@ Under the null hypothesis, the difference of deviances follows chi-square distri
 # model selection
 # H0: smaller, H1: larger
 # chi2 statistic = D(H0)- D(H1)
-(dev21 = fit2_dev - fit1_dev)
-(df21 = fit2$df.residual - fit1$df.residual)
-(1 - pchisq(dev21, df21)) #near 0. reject H0. The larger one is better.
+dev21 = fit2_dev - fit1_dev
+df21 = fit2$df.residual - fit1$df.residual
+(1 - pchisq(dev21, df21)) #near 0. reject H0. The larger one(1) is better.
 
-(dev31 = fit3_dev - fit1_dev)
-(df31 = fit3$df.residual - fit1$df.residual)
-(1 - pchisq(dev31, df31)) #0. reject H0. The larger one is better.
+dev31 = fit3_dev - fit1_dev
+df31 = fit3$df.residual - fit1$df.residual
+(1 - pchisq(dev31, df31)) #0. reject H0. The larger one(1) is better.
 
-(dev42 = fit4_dev - fit2_dev)
-(df42 = fit4$df.residual - fit2$df.residual)
-(1 - pchisq(dev42, df42)) #0. reject H0. the larger one is better
+dev42 = fit4_dev - fit2_dev
+df42 = fit4$df.residual - fit2$df.residual
+(1 - pchisq(dev42, df42)) #0. reject H0. the larger one(2) is better
 
-(dev43 = fit4_dev - fit3_dev)
-(df43 = fit4$df.residual - fit3$df.residual)
-(1 - pchisq(dev43, df43)) #near 0. reject H0. the larger one is better
+dev43 = fit4_dev - fit3_dev
+df43 = fit4$df.residual - fit3$df.residual
+(1 - pchisq(dev43, df43)) #near 0. reject H0. the larger one(3) is better
 
-(dev41 = fit4_dev - fit1_dev)
-(df41 = fit4$df.residual - fit1$df.residual)
-(1 - pchisq(dev41, df41)) #0. reject H0. the larger one is better
+dev41 = fit4_dev - fit1_dev
+df41 = fit4$df.residual - fit1$df.residual
+(1 - pchisq(dev41, df41)) #0. reject H0. the larger one(1) is better
 
 ```
 
-Again, the model having both covariates is best. Let's choose fit1 and draw the fitted plot.
+Again, the model having both covariates(fit1) is best. Let's choose fit1 and draw the fitted plot.
 I will draw plot with $log(num)$ and covariates.
 The left plot is the fitted result with strain value 0 (black), and the middle one is for strain 1 (red).
 The right one is drawn by overlapping both.
