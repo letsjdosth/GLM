@@ -1,0 +1,258 @@
+# STAT209 HW2 (computing)
+
+Seokjun Choi
+
+*All code blocks are R scripts in this HW.*
+
+## Problem 4
+
+Let me load the dataset and set a R function to give us an asymptotic interval estimate at $x_0$.
+
+```{r}
+fabric = read.table("fabric.txt", header=TRUE)
+
+par(mfrow=c(1,2))
+plot(faults~length, data=fabric)
+plot(log(faults)~length, data=fabric)
+
+util1 <- function(x_eval_pt, fitted_beta, fitted_info){
+    eval_exp = c(1, x_eval_pt)
+    pt_est = t(eval_exp) %*% fitted_beta
+    interval_length = qnorm(0.975) * sqrt(t(eval_exp) %*% fitted_info %*% eval_exp)
+    lw_est = pt_est - interval_length
+    up_est = pt_est + interval_length
+    return(data.frame(pt=pt_est, lw=lw_est, up=up_est))
+}
+```
+
+Two graphs show that $log(faults)$ and each covariate have a linear relationship.
+So canonical log link with poisson GLMs may work well.
+
+The below is full-likelihood approach. Since we use a poisson model, there is a no dispersion parameter.
+
+```{r}
+#likelihood approach
+glm_fit = glm(faults~length, data=fabric, family="poisson")
+summary(glm_fit)
+
+util1(500, coef(glm_fit), vcov(glm_fit))
+util1(995, coef(glm_fit), vcov(glm_fit))
+```
+
+Next, we can use quasi-likelihood approach with a dispersion parameter.
+
+```{r}
+#quasi-likelihood approach
+qglm_fit = glm(faults~length, data=fabric, family="quasipoisson")
+summary(qglm_fit)
+
+util1(500, coef(qglm_fit), vcov(qglm_fit))
+util1(995, coef(qglm_fit), vcov(qglm_fit))
+```
+
+Comparing summary results of the regular likelihood fit with the quasi-likelihood fit,
+the point estimates for $\beta_0, \beta_1$ are the same.
+In contrast, regular likelihood approach gives smaller standard error estimates than quasi-likelihood approach.
+
+The results of 'util1' function show the point estimates(pt) and lower bound(lw) and upper bound(up) of the interval estimate at $x_0=500$ and $x_0=995$.
+The different se estimates affect to the interval lengths, too.
+We can see that full-likelihood glm gives shorter interval than quasi-likelihood.
+
+We can guess two cases about mean-variance relationship.
+
+1. $Mean=Variance=\mu_i$ at a fixed $x_i$.
+2. $Mean=\mu_i<Variance$ at a fixed $x_i$, having overdispersion.
+
+If 1 is true, the regular likelihood poisson model is better, giving us more accurate and narrow interval.
+But if 2 is true, the regular likelihood approach gives us wrong interval, but the quasipoisson one remains robust.
+
+But I'm not sure the estimated dispersion parameter in the quasipoisson model is near 1 or not, cause we don't have any distributional assumption on the dispersion.
+So I just want to say 'it is up to true DGP!'
+
+
+## Problem 5
+
+Let me load the dataset for problem 5 and plot relationship between log-response and each covariate.
+
+```{r}
+cerio = read.table("ceriodaphnia.txt")
+colnames(cerio) <- c("num", "concentration", "strain")
+head(cerio)
+cerio$strain <- factor(cerio$strain)
+
+par(mfrow=c(1,2))
+plot(log(num) ~ concentration, data=cerio)
+plot(log(num) ~ strain, data=cerio)
+```
+
+It looks that $concetration$ seems useful to explain $log(num)$ with a linear relationship.
+But it seems hard to expect whether $strain$ is essential.
+
+Let me fit four kinds of models that are all cases that we consider.
+The full model(fit1), the model having intercept and concentration(fit2), 
+the model with intercept and strain(fit3), and with the intercept only(fit4).
+I will print summary, p-value of GOF test using deviaince(H0: good fit, H1: bad fit), AIC, and BIC of each model.
+Note that H0: good fit, H1: bad fit(!) for the test.
+
+```{r}
+#residual deviance: deviance for the model having only the intercept term
+#GOF: H0: smaller, H1: full (less D == good fit)
+
+fit1 <- glm(num ~ concentration + strain, data=cerio, family="poisson")
+summary(fit1)
+fit1_dev = fit1$deviance
+(1 - pchisq(fit1$deviance, fit1$df.residual)) #good with sig.level 0.05
+AIC(fit1) #415.9508
+BIC(fit1) #422.6963
+
+fit2 <- glm(num ~ concentration, data=cerio, family="poisson")
+summary(fit2)
+fit2_dev = fit2$deviance
+(1 - pchisq(fit2$deviance, fit2$df.residual)) #bad
+AIC(fit2) #446.5694
+BIC(fit2) #451.0664
+
+fit3 <- glm(num ~ strain, data=cerio, family="poisson")
+summary(fit3)
+fit3_dev = fit3$deviance
+(1 - pchisq(fit3$deviance, fit3$df.residual)) #bad
+AIC(fit3) #1654.337
+BIC(fit3) #1658.834
+
+fit4 <- glm(num ~ 1, data=cerio, family="poisson")
+summary(fit4)
+fit4_dev = fit4$deviance
+(1 - pchisq(fit4$deviance, fit4$df.residual)) #bad
+AIC(fit4) #1684.955
+BIC(fit4) #1678.204
+```
+
+The model having both covariates is the best in the view of deviance, AIC, and BIC.
+Even if I could not expect that $strain$ is important, it is according to the above results.
+
+Let's move onto the residual analysis.
+I will generate samples following the fitted model with randomness, and refit it using GLM.
+Then, I will draw qqplot between observed-residuals and simulated-residuals.
+If a qqplot looks like a line, it indicates good fit. Ohterwise, it is an evidence of bad fit.
+I will use two kinds of residuals: pearson's residual and deviance residual.
+Both are easily got from the base-R built-in function 'residual'.
+
+```{r}
+set.seed(20221024)
+
+#simulate models - fit1
+sim1_data = rep(0, length(cerio$num))
+for(i in 1:length(cerio$num)){
+    nu = 0
+    if(cerio$strain[i]==0){
+        nu = t(fit1$coefficients) %*% c(1, cerio$concentration[i], 0)
+    } else {
+        nu = t(fit1$coefficients) %*% c(1, cerio$concentration[i], 1)
+    }
+    mu = exp(nu)
+    sim1_data[i] = rpois(1, mu)
+}
+glm_sim1_fit = glm(sim1_data~cerio$concentration + cerio$strain, family="poisson")
+par(mfrow=c(1,2))
+qqplot(residuals(fit1, "pearson"), residuals(glm_sim1_fit, "pearson"), main="pearson")
+qqplot(residuals(fit1, "deviance"), residuals(glm_sim1_fit, "deviance"), main="deviance")
+```
+
+```{r}
+#simulate models - fit2
+sim2_data = rep(0, length(cerio$num))
+for(i in 1:length(cerio$num)){
+    nu = t(fit2$coefficients) %*% c(1, cerio$concentration[i])
+    mu = exp(nu)
+    sim2_data[i] = rpois(1, mu)
+}
+glm_sim2_fit = glm(sim2_data~cerio$concentration, family="poisson")
+par(mfrow=c(1,2))
+qqplot(residuals(fit2, "pearson"), residuals(glm_sim2_fit, "pearson"), main="pearson")
+qqplot(residuals(fit2, "deviance"), residuals(glm_sim2_fit, "deviance"), main="deviance")
+```
+
+```{r}
+#simulate models - fit3
+sim3_data = rep(0, length(cerio$num))
+for(i in 1:length(cerio$num)){
+    nu = 0
+    if(cerio$strain[i]==0){
+        nu = t(fit3$coefficients) %*% c(1, 0)
+    } else {
+        nu = t(fit3$coefficients) %*% c(1, 1)
+    }
+    mu = exp(nu)
+    sim3_data[i] = rpois(1, mu)
+}
+glm_sim3_fit = glm(sim3_data~cerio$strain, family="poisson")
+par(mfrow=c(1,2))
+qqplot(residuals(fit3, "pearson"), residuals(glm_sim3_fit, "pearson"), main="pearson")
+qqplot(residuals(fit3, "deviance"), residuals(glm_sim3_fit, "deviance"), main="deviance")
+```
+
+```{r}
+#simulate models - fit4
+sim4_data = rep(0, length(cerio$num))
+for(i in 1:length(cerio$num)){
+    nu = fit4$coefficients
+    mu = exp(nu)
+    sim4_data[i] = rpois(1, mu)
+}
+glm_sim4_fit = glm(sim4_data~1, family="poisson")
+par(mfrow=c(1,2))
+qqplot(residuals(fit4, "pearson"), residuals(glm_sim4_fit, "pearson"), main="pearson")
+qqplot(residuals(fit4, "deviance"), residuals(glm_sim4_fit, "deviance"), main="deviance")
+```
+
+The fit1, the model with both covariates, gives the most straight-line shaped qqplot.
+So, we can conclude that the model is the best in the view of the goodness-of-fit.
+
+
+Next, let me compare models among (fit1-fit2-fit4) and among (fit1-fit3-fit4) directly using difference of deviances.
+With H0:reduced model is better vs H1:larger model is better.
+Under the null hypothesis, the difference of deviances follows chi-square distribution with df = difference of the numbers of parameters.
+
+```{r}
+# model selection
+# H0: smaller, H1: larger
+# chi2 statistic = D(H0)- D(H1)
+(dev21 = fit2_dev - fit1_dev)
+(df21 = fit2$df.residual - fit1$df.residual)
+(1 - pchisq(dev21, df21)) #near 0. reject H0. The larger one is better.
+
+(dev31 = fit3_dev - fit1_dev)
+(df31 = fit3$df.residual - fit1$df.residual)
+(1 - pchisq(dev31, df31)) #0. reject H0. The larger one is better.
+
+(dev42 = fit4_dev - fit2_dev)
+(df42 = fit4$df.residual - fit2$df.residual)
+(1 - pchisq(dev42, df42)) #0. reject H0. the larger one is better
+
+(dev43 = fit4_dev - fit3_dev)
+(df43 = fit4$df.residual - fit3$df.residual)
+(1 - pchisq(dev43, df43)) #near 0. reject H0. the larger one is better
+
+(dev41 = fit4_dev - fit1_dev)
+(df41 = fit4$df.residual - fit1$df.residual)
+(1 - pchisq(dev41, df41)) #0. reject H0. the larger one is better
+
+```
+
+Again, the model having both covariates is best. Let's choose fit1 and draw the fitted plot.
+I will draw plot with $log(num)$ and covariates.
+The left plot is the fitted result with strain value 0 (black), and the middle one is for strain 1 (red).
+The right one is drawn by overlapping both.
+
+```{r, echo=FALSE}
+#choose fit1!
+par(mfrow=c(1,3))
+plot(log(num) ~ concentration, data=cerio[cerio["strain"]==0,], main="strain==0")
+abline(fit1$coefficients[1], fit1$coefficients[2])
+plot(log(num) ~ concentration, data=cerio[cerio["strain"]==1,], col="red", main="strain==1")
+abline(fit1$coefficients[1]+fit1$coefficients[3], fit1$coefficients[2], col="red")
+
+plot(log(num) ~ concentration, col=strain, data=cerio, main="all")
+abline(fit1$coefficients[1], fit1$coefficients[2])
+abline(fit1$coefficients[1]+fit1$coefficients[3], fit1$coefficients[2], col="red")
+```
