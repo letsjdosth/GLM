@@ -67,7 +67,8 @@ pll_dev_res <- function(m, y, fitted_pi){
 #pll dev.resid
 pll_dev_res(beetles, killed, pll_fit) #cause m=y for last point, it gives NaN
 
-# AIC / BIC
+
+# 1d. AIC / BIC
 pll_log_lik = 0
 for(i in 1:8){
     pll_log_lik = pll_log_lik + dbinom(killed[i],beetles[i],pll_fit[i], log=TRUE)
