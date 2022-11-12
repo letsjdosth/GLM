@@ -1,0 +1,176 @@
+# STAT209 HW3 
+
+Seokjun Choi
+
+
+## Problem 1
+
+*Code blocks are R scripts of this problem.*
+
+*Executable stand-alone R script: https://github.com/letsjdosth/GLM/blob/main/hw3q1.r*
+
+I will use the same notation given in the problem.
+
+### 1-(a)
+
+Let me fit three models having different links, logit, probit, and complementary log-log, respectively.
+It is easy cause base-R's 'glm' and 'binomial' functions offer everything that I need.
+
+```{r}
+log_dose <- c(1.6907, 1.7242, 1.7552, 1.7842, 1.8113, 1.8369, 1.8610, 1.8839)
+beetles <- c(59, 60, 62, 56, 63, 59, 62, 60) #m
+killed <- c(6, 13, 18, 28, 52, 53, 61, 60) #y
+
+#1a
+logit_fit = glm(cbind(killed, beetles-killed)~log_dose, family=binomial(link="logit"))
+summary(logit_fit)
+probit_fit = glm(cbind(killed, beetles-killed)~log_dose, family=binomial(link="probit"))
+summary(probit_fit)
+cloglog_fit = glm(cbind(killed, beetles-killed)~log_dose, family=binomial(link="cloglog"))
+summary(cloglog_fit)
+```
+
+Getting deviance residual is also easy in R.
+All functions that we need are already implemented in base-R.
+
+```{r}
+res_logit = residuals(logit_fit, "deviance")
+res_probit = residuals(probit_fit, "deviance")
+res_cloglog = residuals(cloglog_fit, "deviance")
+
+plot(log_dose, res_logit, col="orange", xlim=c(1.65, 1.9), cex=3)
+points(log_dose, res_probit, col="red", cex=3)
+points(log_dose, res_cloglog, col="blue", cex=3)
+abline(h=0)
+```
+
+The above plot is a overlaid residual plot.
+I put three model's residuals in the plot.
+Orange dots are of the logit model's, red dots are of the probit model's, and blue dots are from the cloglog model.
+
+It seems that logit and probit fits are pretty similar.
+Comparing them to cloglog model, we may say that cloglog model performs better than the others,
+generally having smaller residuals in the view of abstract values (norm values).
+
+Next, I show the $\pi_i$ fits verses thecovariate.
+
+```{r}
+inv_logit <- function(x, beta_0, beta_1){
+    return(exp(beta_0 + beta_1*x) / (1 + exp(beta_0 + beta_1*x)))
+}
+inv_probit <- function(x, beta_0, beta_1){
+    return(pnorm(beta_0 + beta_1*x))
+}
+inv_cloglog <- function(x, beta_0, beta_1){
+    return(1-exp(-exp(beta_0 + beta_1*x)))
+}
+# grid = seq(1.65, 1.9, 0.005)
+plot(log_dose, killed/beetles, xlim=c(1.65, 1.9), cex=3)
+curve(inv_logit(x, logit_fit$coefficients[1], logit_fit$coefficients[2]), add=T, col="orange")
+curve(inv_probit(x, probit_fit$coefficients[1], probit_fit$coefficients[2]), add=T, col="red")
+curve(inv_cloglog(x, cloglog_fit$coefficients[1], cloglog_fit$coefficients[2]), add=T, col="blue")
+```
+
+Again, the logit model fit has the orange color, the probit model is red, and cloglog model uses blue.
+Black dots are observed ratio, calculated by $y_i/m_i$.
+
+We can see that cloglog fit(blue) is closer to observed ratio for almost all points.
+I think that the asymmetry of cloglog link may help to fit better.
+
+### 1-(b)
+
+Please see the separately attached note.
+
+### 1-(c)
+
+Cause all MLE values are given, we can track back fitted $\pi_i$ as well as the model's likelihood value.
+Because the equation (1.1) directly gives us the inverse link function, we can use it to get fitted $\pi_i$.
+
+```{r}
+#1c: alpha-power logit link
+pll_beta0 = -113.625
+pll_beta1 = 62.5
+pll_alpha = 0.279
+
+pll_inv <- function(x, beta_0, beta_1, alpha){
+    nu = beta_0 + beta_1*x
+    return(exp(alpha*nu)/((1+exp(nu))^alpha))
+}
+(pll_fit = pll_inv(log_dose, pll_beta0, pll_beta1, pll_alpha))
+```
+The above output shows fitted $\pi_i$s at the $i$th data point.
+
+Plus, let me put the $\pi$ fits of the powered-logit link model over the previous plot I showed.
+
+```{r}
+plot(log_dose, killed/beetles, xlim=c(1.65, 1.9), cex=3)
+curve(inv_logit(x, logit_fit$coefficients[1], logit_fit$coefficients[2]), add=T, col="orange")
+curve(inv_probit(x, probit_fit$coefficients[1], probit_fit$coefficients[2]), add=T, col="red")
+curve(inv_cloglog(x, cloglog_fit$coefficients[1], cloglog_fit$coefficients[2]), add=T, col="blue")
+curve(pll_inv(x, pll_beta0, pll_beta1, pll_alpha), add=T, col="green")
+```
+
+The green curve is the new powered-logit link model fit.
+In the left tail, it assigns more $pi$ than cloglog fit.
+In the middle area (between $1.75$ and $1.80$,) powered-logit fit is giving slightly lower $\pi$ than cloglog fit,
+making closer fit to $y/m$.
+In the right tail, cloglog and powered logit link fits are very similar.
+
+We can conclude that powered logit fit is quite good, carrying a very flexible asymmetry.
+But it is not different very much from cloglog fit, though.
+If we want a simpler model, cloglog fit may be better.
+
+
+```{r}
+pll_dev_res <- function(m, y, fitted_pi){
+    red_theta = log(fitted_pi/(1-fitted_pi))
+    full_theta = log(y/(m-y))
+    d = 2*(y*(full_theta - red_theta) + m*log((1+exp(red_theta))/(1+exp(full_theta))))
+    sign = ifelse((y/m - fitted_pi)>0, +1, -1)
+    return(sign*sqrt(d))
+}
+
+#pll dev.resid
+pll_dev_res(beetles, killed, pll_fit) #cause m=y for last point, it gives NaN
+```
+
+Finally, the last line's output gives us the residual values.
+The function named 'pll_dev_res' calculates the deviance residual of the new model.
+Since $m_i=y_i$ at $i=8$, my poor, non adjusted funtion yields 'NaN'.
+We may use adjusted deviance residual formula for $y=m$ or $y=0$ cases, but let me skip it here.
+
+Other values except for one are quite close to 0.
+
+### 1-(d)
+
+Belows are AIC and BIC values for each model.
+
+```{r}
+# 1d. AIC / BIC
+pll_log_lik = 0
+for(i in 1:8){
+    pll_log_lik = pll_log_lik + dbinom(killed[i],beetles[i],pll_fit[i], log=TRUE)
+}
+# (pll_log_lik)
+
+pll_num_param = 3
+(pll_AIC = -2*pll_log_lik + 2*pll_num_param)
+(pll_BIC = -2*pll_log_lik + pll_num_param * log(8))
+
+AIC(logit_fit)
+BIC(logit_fit)
+AIC(probit_fit)
+BIC(probit_fit)
+AIC(cloglog_fit)
+BIC(cloglog_fit)
+
+```
+
+Interestingly, both AIC and BIC select cloglog fit.
+It consists of what we found earlier.
+
+Basic logit and probit fit were worse than cloglog or powered logit fit, so they also have higher AIC and BIC values.
+
+Since powered logit model has one more parameter, it gets more penalty from AIC and BIC calculations.
+But the fit of powered logit link model was not much improved from cloglog fit, according to the previous observation.
+That's why AIC and BIC of powered logit link fit is higher than cloglog fit.

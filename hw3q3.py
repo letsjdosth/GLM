@@ -103,6 +103,9 @@ def loss_L_measure(posterior_samples, predictive_generator, k): #depend on x_y
         loss += (predictive_var_at_x + (k/(k+1))*(y-predictive_mean_at_x)**2)
     return loss
 
+def get_posterior_samples_for_mu(x, posterior_samples, link_func):
+    return [link_func(x, params) for params in posterior_samples]
+
 def gamma_predictive_generator(x, param):
     #param: [beta1, beta2, lambda]
     shape = exp(param[2]) #v
@@ -118,6 +121,8 @@ def inv_gaussian_predictive_generator(x, param): #need to check. is it right?
 
 def log_link(x, params):
     return exp(params[0]+params[1]*x)
+
+
 
 
 gamma_log_initial = [0,0,0]
@@ -147,6 +152,17 @@ print(loss_L_measure(gamma_log_diag.MC_sample, gamma_predictive_generator, 10))
 #2236.2657701169755 at k=2
 #2548.666959908084 at k=10
 
+
+gamma_mu_at_400 = get_posterior_samples_for_mu(400, gamma_log_diag.MC_sample, log_link)
+gamma_mu_at_650 = get_posterior_samples_for_mu(650, gamma_log_diag.MC_sample, log_link)
+gamma_pred_y_at_400 = [gamma_predictive_generator(400, s) for s in gamma_log_diag.MC_sample]
+gamma_pred_y_at_650 = [gamma_predictive_generator(650, s) for s in gamma_log_diag.MC_sample]
+gamma_log_diag2 = MCMC_Core.MCMC_Diag()
+gamma_log_diag2.set_mc_samples_from_list([(a,b,c,d) for (a,b,c,d) in zip(gamma_mu_at_400, gamma_mu_at_650, gamma_pred_y_at_400, gamma_pred_y_at_650)])
+gamma_log_diag2.set_variable_names(["mu_400", "mu_650", "pred_y_400", "pred_y_650"])
+gamma_log_diag2.show_hist((2,2))
+
+
 # ===
 
 inv_gaussian_log_initial = [0,0,0]
@@ -174,3 +190,12 @@ print(loss_L_measure(inv_gaussian_log_diag.MC_sample, inv_gaussian_predictive_ge
 print(loss_L_measure(inv_gaussian_log_diag.MC_sample, inv_gaussian_predictive_generator, 10))
 #2279.2581621040554 at k=2
 #2586.9292392851125 at k=10
+
+inv_gaussian_mu_at_400 = get_posterior_samples_for_mu(400, inv_gaussian_log_diag.MC_sample, log_link)
+inv_gaussian_mu_at_650 = get_posterior_samples_for_mu(650, inv_gaussian_log_diag.MC_sample, log_link)
+inv_gaussian_pred_y_at_400 = [inv_gaussian_predictive_generator(400, s) for s in inv_gaussian_log_diag.MC_sample]
+inv_gaussian_pred_y_at_650 = [inv_gaussian_predictive_generator(650, s) for s in inv_gaussian_log_diag.MC_sample]
+inv_gaussian_log_diag2 = MCMC_Core.MCMC_Diag()
+inv_gaussian_log_diag2.set_mc_samples_from_list([(a,b,c,d) for (a,b,c,d) in zip(inv_gaussian_mu_at_400, inv_gaussian_mu_at_650, inv_gaussian_pred_y_at_400, inv_gaussian_pred_y_at_650)])
+inv_gaussian_log_diag2.set_variable_names(["mu_400", "mu_650", "pred_y_400", "pred_y_650"])
+inv_gaussian_log_diag2.show_hist((2,2))
