@@ -1,0 +1,69 @@
+# HW4 problem 3
+
+Seokjun Choi
+
+*Code blocks are R scripts in this problem.*
+
+*Executable stand-alone R script: https://github.com/letsjdosth/GLM/blob/main/hw4q3b.r*
+
+*All scripts are tested in R 4.2.0 64-bit, in Windows 10.*
+ 
+
+## 3-(b)
+
+```{r}
+concentration <- c(0, 62.5, 125, 250, 500)
+num_subject <- c(297, 242, 312, 299, 285)
+response <- matrix(
+    c(15, 1, 281,
+    17, 0, 225,
+    22, 7, 283,
+    38, 59, 202,
+    144, 132, 9), 5, 3, byrow=TRUE)
+```
+
+Because the model is perfectly decomposed into two binomial GLM models,
+we can easily fit the model using the 'glm' function twice.
+
+```{r}
+# L1 part fit
+L1_y = response[,1]
+L1_m_y = response[,2]+response[,3]
+L1_fit = glm(cbind(L1_y, L1_m_y)~concentration, family="binomial")
+summary(L1_fit)
+
+# L2 part fit
+L2_y = response[,2]
+L2_m_y = response[,3]
+L2_fit = glm(cbind(L2_y, L2_m_y)~concentration, family="binomial")
+summary(L2_fit)
+```
+
+We can take estimates and standard errors of $\alpha_1, \beta_1$ from the 'L1_fit' summary,
+and of $\alpha_2, \beta_2$ from the 'L2_fit' summary.
+
+Below is $\pi$ -plots.
+The black curve is for $\pi_1$ (dead), the red is for $\pi_2$ (malformation), and the blue is for $\pi_3$ (normal).
+
+```{r}
+grid = seq(0, 601, 1)
+inv_logit <- function(x, coeff_vec){
+    alpha = coeff_vec[1]
+    beta = coeff_vec[2]
+    exp_val = exp(alpha+beta*x)
+    return(exp_val/(1+exp_val))
+}
+
+
+rho1_on_grid = inv_logit(grid, coef(L1_fit))
+rho2_on_grid = inv_logit(grid, coef(L2_fit))
+pi1_on_grid = rho1_on_grid
+pi2_on_grid = rho2_on_grid * (1 - pi1_on_grid)
+pi3_on_grid = 1 - pi1_on_grid - pi2_on_grid
+plot(grid, pi1_on_grid, type="l", ylim=c(0,1), main="pi", xlab="concentration", ylab="pi")
+points(grid, pi2_on_grid, type="l", col="red")
+points(grid, pi3_on_grid, type="l", col="blue")
+```
+
+The result is coherent with our intuition. Toxin concentration is associated with malformation or even dead.
+(We may not draw some 'causal' interpretation, though. It depends on experimental design, so I need more information to draw it.)

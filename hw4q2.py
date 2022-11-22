@@ -1,10 +1,12 @@
 from random import seed, normalvariate
-from math import exp, log
 from functools import partial
+
 import matplotlib.pyplot as plt
 import numpy as np
 
 from pyBayes import MCMC_Core
+
+seed(20221120)
 
 #data
 class AlligatorFoodChoice:
