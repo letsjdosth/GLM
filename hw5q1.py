@@ -42,22 +42,22 @@ def q1a_log_posterior_with_flat_prior(beta, y_x):
         log_post += (y*nu - exp(nu))
     return log_post
 
-q1a_initial = [0,0]
-q1a_inst = MCMC_Core.MCMC_MH(
-                partial(q1a_log_posterior_with_flat_prior, y_x=y_x_fabric),
-                symmetric_proposal_placeholder,
-                partial(normal_proposal_sampler, proposal_sigma_vec=[0.15, 0.0003]),
-                q1a_initial)
-q1a_inst.generate_samples(50000, print_iter_cycle=10000)
-q1a_diag = MCMC_Core.MCMC_Diag()
-q1a_diag.set_mc_sample_from_MCMC_instance(q1a_inst)
-q1a_diag.set_variable_names(["beta_1", "beta_2"])
-q1a_diag.burnin(5000)
-q1a_diag.thinning(5)
-q1a_diag.print_summaries(6)
-q1a_diag.show_traceplot((1,2))
-q1a_diag.show_acf(30, (1,2))
-q1a_diag.show_hist((1,2))
+# q1a_initial = [0,0]
+# q1a_inst = MCMC_Core.MCMC_MH(
+#                 partial(q1a_log_posterior_with_flat_prior, y_x=y_x_fabric),
+#                 symmetric_proposal_placeholder,
+#                 partial(normal_proposal_sampler, proposal_sigma_vec=[0.15, 0.0003]),
+#                 q1a_initial)
+# q1a_inst.generate_samples(50000, print_iter_cycle=10000)
+# q1a_diag = MCMC_Core.MCMC_Diag()
+# q1a_diag.set_mc_sample_from_MCMC_instance(q1a_inst)
+# q1a_diag.set_variable_names(["beta_1", "beta_2"])
+# q1a_diag.burnin(5000)
+# q1a_diag.thinning(5)
+# q1a_diag.print_summaries(6)
+# q1a_diag.show_traceplot((1,2))
+# q1a_diag.show_acf(30, (1,2))
+# q1a_diag.show_hist((1,2))
 
 
 def q1a_mu_plot(posterior_samples, set_x_axis, show=True): #depend on data (not first-class function!)
@@ -122,14 +122,14 @@ def loss_L_measure(predictive_samples, k): #depend on data (not first-class func
     return loss
 
 
-q1a_mu_plot(q1a_diag.MC_sample, (100, 1000, 1))
+# q1a_mu_plot(q1a_diag.MC_sample, (100, 1000, 1))
 
-q1a_predictive_samples = q1a_generate_predictive_samples(q1a_diag.MC_sample)
-post_pred_resid_plot(q1a_predictive_samples)
-print("quadratic loss measure, k=1 :", loss_L_measure(q1a_predictive_samples, 1))
-print("quadratic loss measure, k=2 :", loss_L_measure(q1a_predictive_samples, 2))
-print("quadratic loss measure, k=5 :", loss_L_measure(q1a_predictive_samples, 5))
-print("quadratic loss measure, k=10 :", loss_L_measure(q1a_predictive_samples, 10))
+# q1a_predictive_samples = q1a_generate_predictive_samples(q1a_diag.MC_sample)
+# post_pred_resid_plot(q1a_predictive_samples)
+# print("quadratic loss measure, k=1 :", loss_L_measure(q1a_predictive_samples, 1))
+# print("quadratic loss measure, k=2 :", loss_L_measure(q1a_predictive_samples, 2))
+# print("quadratic loss measure, k=5 :", loss_L_measure(q1a_predictive_samples, 5))
+# print("quadratic loss measure, k=10 :", loss_L_measure(q1a_predictive_samples, 10))
 
 
 #problem 1b
@@ -191,10 +191,17 @@ class Q1b_Gibbs(MCMC_Core.MCMC_Gibbs):
             log_post += (-2*log(lamb+1))
             return log_post
         
+        def gibbs_lambda_log_posterior_with_gamma_prior(lamb, beta, mu_vec, y_x):
+            log_post = gibbs_lambda_log_posterior_with_1_prior(lamb, beta, mu_vec, y_x)
+            a = 2
+            b = 2
+            log_post += ((a-1)*log(lamb) - b*lamb)
+            return log_post
+
         initial = last_param[2]
         window = 10
         mc_mh_inst = MCMC_Core.MCMC_MH(
-                        partial(gibbs_lambda_log_posterior_with_invquad_prior, beta = last_param[0], mu_vec=last_param[1], y_x=self.y_x),
+                        partial(gibbs_lambda_log_posterior_with_invquad_prior, beta = last_param[0], mu_vec=last_param[1], y_x=self.y_x), #prior sensitivity analysis!
                         partial(unif_proposal_log_pdf, window=window),
                         partial(unif_proposal_sampler, window=window),
                         initial)
