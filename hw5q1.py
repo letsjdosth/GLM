@@ -60,6 +60,78 @@ q1a_diag.show_acf(30, (1,2))
 q1a_diag.show_hist((1,2))
 
 
+def q1a_mu_plot(posterior_samples, set_x_axis, show=True): #depend on data (not first-class function!)
+    x_grid = np.arange(set_x_axis[0], set_x_axis[1], set_x_axis[2])
+    mu_lwr = [] #I
+    mu_med = []
+    mu_upr = []
+    mu_avg = []
+
+    for x in x_grid:
+        mu_samples_at_x = []
+
+        for beta in posterior_samples:
+            mu_samples_at_x.append(exp(beta[0]+beta[1]*x))
+
+        mu_lwr.append(float(np.quantile(mu_samples_at_x, 0.025)))
+        mu_med.append(float(np.quantile(mu_samples_at_x, 0.5)))
+        mu_upr.append(float(np.quantile(mu_samples_at_x, 0.975)))
+        mu_avg.append(float(np.mean(mu_samples_at_x)))
+
+    plt.ylim([0, 30])
+    plt.plot(x_grid, mu_avg, color="black", linestyle="solid")
+    plt.plot(x_grid, mu_med, color="black", linestyle="dashed")
+    plt.plot(x_grid, mu_lwr, color="grey")
+    plt.plot(x_grid, mu_upr, color="grey")
+
+    plt.plot(x_fabric_length, y_fabric_faults, marker="o", color="black", linestyle="none")
+    
+    if show:
+        plt.show()
+
+def q1a_generate_predictive_samples(posterior_samples): #depend on data (not first-class function!)
+    predictive_samples = []
+    for x in x_fabric_length:
+        pred_samples_at_x = []
+        for beta in posterior_samples:
+            mu_at_x = exp(beta[0]+beta[1]*x)
+            pred_samples_at_x.append(np.random.poisson(mu_at_x))
+        predictive_samples.append(pred_samples_at_x)
+    return predictive_samples
+
+def post_pred_resid_plot(predictive_samples): #depend on data (not first-class function!)
+    x_grid = x_fabric_length
+    boxplot_frame = []
+    for i, (obs_y, _) in enumerate(y_x_fabric):
+        res_samples_at_x = [y_new - obs_y for y_new in predictive_samples[i]]
+        boxplot_frame.append(res_samples_at_x)
+
+    plt.figure(figsize=(12,5))
+    plt.boxplot(np.transpose(boxplot_frame), labels=x_grid)
+    plt.axhline(0)
+    plt.tight_layout()
+    plt.show()
+
+
+def loss_L_measure(predictive_samples, k): #depend on data (not first-class function!)
+    loss = 0
+    for i, (obs_y, _) in enumerate(y_x_fabric):
+        predictive_var_at_x = np.var(predictive_samples[i])
+        predictive_mean_at_x = np.mean(predictive_samples[i])
+        loss += (predictive_var_at_x + (k/(k+1))*(obs_y-predictive_mean_at_x)**2)
+    return loss
+
+
+q1a_mu_plot(q1a_diag.MC_sample, (100, 1000, 1))
+
+q1a_predictive_samples = q1a_generate_predictive_samples(q1a_diag.MC_sample)
+post_pred_resid_plot(q1a_predictive_samples)
+print("quadratic loss measure, k=1 :", loss_L_measure(q1a_predictive_samples, 1))
+print("quadratic loss measure, k=2 :", loss_L_measure(q1a_predictive_samples, 2))
+print("quadratic loss measure, k=5 :", loss_L_measure(q1a_predictive_samples, 5))
+print("quadratic loss measure, k=10 :", loss_L_measure(q1a_predictive_samples, 10))
+
+
 #problem 1b
 class Q1b_Gibbs(MCMC_Core.MCMC_Gibbs):
     def __init__(self, initial, y_x):
@@ -81,7 +153,7 @@ class Q1b_Gibbs(MCMC_Core.MCMC_Gibbs):
         mc_mh_inst = MCMC_Core.MCMC_MH(
                         partial(gibbs_beta_log_posterior_with_flat_prior, mu_vec=last_param[1], lamb=last_param[2], y_x=self.y_x),
                         symmetric_proposal_placeholder,
-                        partial(normal_proposal_sampler, proposal_sigma_vec=[1.5, 0.002]),
+                        partial(normal_proposal_sampler, proposal_sigma_vec=[0.6, 0.0005]),
                         initial)
         mc_mh_inst.generate_samples(2, verbose=False)
         new_beta = mc_mh_inst.MC_sample[-1]
@@ -96,7 +168,7 @@ class Q1b_Gibbs(MCMC_Core.MCMC_Gibbs):
         for i, (y, x) in enumerate(self.y_x):
             nu = last_param[0][0] + last_param[0][1] * x
             lamb = last_param[2]
-            new_mu[i] = gammavariate(lamb+y, 1+lamb*exp(-nu))
+            new_mu[i] = gammavariate(lamb+y, 1/(1+lamb*exp(-nu)))
         new_param[1] = new_mu
         return new_param
 
@@ -145,14 +217,14 @@ class Q1b_Gibbs(MCMC_Core.MCMC_Gibbs):
 
 q1b_initial = [[0,0], [0 for _ in range(len(y_x_fabric))], 0.5]
 q1b_inst = Q1b_Gibbs(q1b_initial, y_x_fabric)
-q1b_inst.generate_samples(100000, print_iter_cycle=20000)
+q1b_inst.generate_samples(50000, print_iter_cycle=10000)
 
 q1b_diag1 = MCMC_Core.MCMC_Diag()
 q1b_MC_samples1 = [t[0] + [t[2]] for t in q1b_inst.MC_sample]
 q1b_diag1.set_mc_samples_from_list(q1b_MC_samples1)
 q1b_diag1.set_variable_names(["beta_1", "beta_2", "lambda"])
 q1b_diag1.burnin(5000)
-q1b_diag1.thinning(2)
+q1b_diag1.thinning(5)
 q1b_diag1.print_summaries(6)
 q1b_diag1.show_traceplot((1,3))
 q1b_diag1.show_acf(30, (1,3))
@@ -163,8 +235,58 @@ q1b_MC_samples1 = [t[1] for t in q1b_inst.MC_sample]
 q1b_diag2.set_mc_samples_from_list(q1b_MC_samples1)
 q1b_diag2.set_variable_names(["mu"+str(i) for i in range(len(y_x_fabric))])
 q1b_diag2.burnin(5000)
-q1b_diag2.thinning(2)
+q1b_diag2.thinning(5)
 q1b_diag2.print_summaries(6)
 q1b_diag2.show_traceplot((1,3), [0,1,2])
 q1b_diag2.show_acf(30, (1,3), [0,1,2])
 q1b_diag2.show_hist((1,3), [0,1,2])
+
+
+
+def q1b_mu_plot(posterior_beta_lambda_samples, set_x_axis, show=True): #depend on data (not first-class function!)
+    x_grid = np.arange(set_x_axis[0], set_x_axis[1], set_x_axis[2])
+    mu_lwr = []
+    mu_med = []
+    mu_upr = []
+    mu_avg = []
+
+    for x in x_grid:
+        mu_samples_at_x = []
+
+        for beta_lambda in posterior_beta_lambda_samples:
+            lamb = beta_lambda[2]
+            gamma_at_x = exp(beta_lambda[0]+beta_lambda[1]*x)
+            mu_samples_at_x.append(gammavariate(lamb, 1/(lamb/gamma_at_x)))
+
+        mu_lwr.append(float(np.quantile(mu_samples_at_x, 0.025)))
+        mu_med.append(float(np.quantile(mu_samples_at_x, 0.5)))
+        mu_upr.append(float(np.quantile(mu_samples_at_x, 0.975)))
+        mu_avg.append(float(np.mean(mu_samples_at_x)))
+
+    plt.ylim([0, 30])
+    plt.plot(x_grid, mu_avg, color="black", linestyle="solid")
+    plt.plot(x_grid, mu_med, color="black", linestyle="dashed")
+    plt.plot(x_grid, mu_lwr, color="grey")
+    plt.plot(x_grid, mu_upr, color="grey")
+
+    plt.plot(x_fabric_length, y_fabric_faults, marker="o", color="black", linestyle="none")
+    
+    if show:
+        plt.show()
+
+def q1b_generate_predictive_samples(posterior_mu_samples): #depend on data (not first-class function!)
+    predictive_samples = [[] for _ in range(len(x_fabric_length))]
+    for mu in posterior_mu_samples:
+        for i, m_i in enumerate(mu):
+            predictive_samples[i].append(np.random.poisson(m_i))
+    return predictive_samples
+
+
+q1b_mu_plot(q1b_diag1.MC_sample, (100, 1000, 1))
+
+q1b_predictive_samples = q1b_generate_predictive_samples(q1b_diag2.MC_sample)
+post_pred_resid_plot(q1b_predictive_samples)
+print("quadratic loss measure, k=1 :", loss_L_measure(q1b_predictive_samples, 1))
+print("quadratic loss measure, k=2 :", loss_L_measure(q1b_predictive_samples, 2))
+print("quadratic loss measure, k=5 :", loss_L_measure(q1b_predictive_samples, 5))
+print("quadratic loss measure, k=10 :", loss_L_measure(q1b_predictive_samples, 10))
