@@ -23,10 +23,12 @@ def normal_proposal_sampler(from_smpl, proposal_sigma_vec):
 def unif_proposal_log_pdf(from_smpl, to_smpl, window):
     applied_window = [max(0, from_smpl-window/2), from_smpl+window/2]
     if to_smpl<applied_window[0] or to_smpl>applied_window[1]:
-        return -inf
+        # return -inf
+        raise ValueError("to_smpl has an unacceptable value")
     else:
         applied_window_len = applied_window[1] - applied_window[0]
-        return 1/applied_window_len
+        # return 1/applied_window_len
+        return -log(applied_window_len)
 
 def unif_proposal_sampler(from_smpl, window):
     applied_window = [max(0, from_smpl-window/2), from_smpl+window/2]
@@ -42,22 +44,22 @@ def q1a_log_posterior_with_flat_prior(beta, y_x):
         log_post += (y*nu - exp(nu))
     return log_post
 
-q1a_initial = [0,0]
-q1a_inst = MCMC_Core.MCMC_MH(
-                partial(q1a_log_posterior_with_flat_prior, y_x=y_x_fabric),
-                symmetric_proposal_placeholder,
-                partial(normal_proposal_sampler, proposal_sigma_vec=[0.15, 0.0003]),
-                q1a_initial)
-q1a_inst.generate_samples(50000, print_iter_cycle=10000)
-q1a_diag = MCMC_Core.MCMC_Diag()
-q1a_diag.set_mc_sample_from_MCMC_instance(q1a_inst)
-q1a_diag.set_variable_names(["beta_1", "beta_2"])
-q1a_diag.burnin(5000)
-q1a_diag.thinning(5)
-q1a_diag.print_summaries(6)
-q1a_diag.show_traceplot((1,2))
-q1a_diag.show_acf(30, (1,2))
-q1a_diag.show_hist((1,2))
+# q1a_initial = [0,0]
+# q1a_inst = MCMC_Core.MCMC_MH(
+#                 partial(q1a_log_posterior_with_flat_prior, y_x=y_x_fabric),
+#                 symmetric_proposal_placeholder,
+#                 partial(normal_proposal_sampler, proposal_sigma_vec=[0.15, 0.0003]),
+#                 q1a_initial)
+# q1a_inst.generate_samples(50000, print_iter_cycle=10000)
+# q1a_diag = MCMC_Core.MCMC_Diag()
+# q1a_diag.set_mc_sample_from_MCMC_instance(q1a_inst)
+# q1a_diag.set_variable_names(["beta_1", "beta_2"])
+# q1a_diag.burnin(5000)
+# q1a_diag.thinning(5)
+# q1a_diag.print_summaries(6)
+# q1a_diag.show_traceplot((1,2))
+# q1a_diag.show_acf(30, (1,2))
+# q1a_diag.show_hist((1,2))
 
 
 def q1a_mu_plot(posterior_samples, set_x_axis, show=True): #depend on data (not first-class function!)
@@ -113,23 +115,30 @@ def post_pred_resid_plot(predictive_samples): #depend on data (not first-class f
     plt.show()
 
 
-def loss_L_measure(predictive_samples, k): #depend on data (not first-class function!)
+def loss_L_measure(predictive_samples, k, part=False): #depend on data (not first-class function!)
     loss = 0
+    var_part = 0
+    mean_part = 0
     for i, (obs_y, _) in enumerate(y_x_fabric):
         predictive_var_at_x = np.var(predictive_samples[i])
         predictive_mean_at_x = np.mean(predictive_samples[i])
+        var_part += predictive_var_at_x
+        mean_part += ((obs_y-predictive_mean_at_x)**2)
         loss += (predictive_var_at_x + (k/(k+1))*(obs_y-predictive_mean_at_x)**2)
-    return loss
+    if part:
+        return (loss, var_part, mean_part)
+    else:
+        return loss
 
 
-q1a_mu_plot(q1a_diag.MC_sample, (100, 1000, 1))
+# q1a_mu_plot(q1a_diag.MC_sample, (100, 1000, 1))
 
-q1a_predictive_samples = q1a_generate_predictive_samples(q1a_diag.MC_sample)
-post_pred_resid_plot(q1a_predictive_samples)
-print("quadratic loss measure, k=1 :", loss_L_measure(q1a_predictive_samples, 1))
-print("quadratic loss measure, k=2 :", loss_L_measure(q1a_predictive_samples, 2))
-print("quadratic loss measure, k=5 :", loss_L_measure(q1a_predictive_samples, 5))
-print("quadratic loss measure, k=10 :", loss_L_measure(q1a_predictive_samples, 10))
+# q1a_predictive_samples = q1a_generate_predictive_samples(q1a_diag.MC_sample)
+# post_pred_resid_plot(q1a_predictive_samples)
+# print("quadratic loss measure, k=1 :", loss_L_measure(q1a_predictive_samples, 1))
+# print("quadratic loss measure, k=2 :", loss_L_measure(q1a_predictive_samples, 2))
+# print("quadratic loss measure, k=5 :", loss_L_measure(q1a_predictive_samples, 5))
+# print("quadratic loss measure, k=10 :", loss_L_measure(q1a_predictive_samples, 10))
 
 
 #problem 1b
@@ -199,7 +208,7 @@ class Q1b_Gibbs(MCMC_Core.MCMC_Gibbs):
             return log_post
 
         initial = last_param[2]
-        window = 10
+        window = 10 #10
         mc_mh_inst = MCMC_Core.MCMC_MH(
                         partial(gibbs_lambda_log_posterior_with_invquad_prior, beta = last_param[0], mu_vec=last_param[1], y_x=self.y_x), #prior sensitivity analysis!
                         partial(unif_proposal_log_pdf, window=window),
@@ -289,6 +298,7 @@ def q1b_generate_predictive_samples(posterior_mu_samples): #depend on data (not 
     return predictive_samples
 
 
+q1b_diag1.show_scatterplot(0,1)
 q1b_mu_plot(q1b_diag1.MC_sample, (100, 1000, 1))
 
 q1b_predictive_samples = q1b_generate_predictive_samples(q1b_diag2.MC_sample)
@@ -297,3 +307,4 @@ print("quadratic loss measure, k=1 :", loss_L_measure(q1b_predictive_samples, 1)
 print("quadratic loss measure, k=2 :", loss_L_measure(q1b_predictive_samples, 2))
 print("quadratic loss measure, k=5 :", loss_L_measure(q1b_predictive_samples, 5))
 print("quadratic loss measure, k=10 :", loss_L_measure(q1b_predictive_samples, 10))
+print("loss, var, mean: ", loss_L_measure(q1b_predictive_samples, 1, True))
